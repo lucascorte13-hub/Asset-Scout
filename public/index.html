@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Scout</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1923; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        h1 { text-align: center; margin-bottom: 10px; color: #00d4aa; font-size: 1.8rem; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 0.9rem; }
+        .controls { max-width: 700px; margin: 0 auto 30px; background: #1a2736; padding: 20px; border-radius: 12px; border: 1px solid #2a3a4a; }
+        .controls h2 { color: #00d4aa; margin-bottom: 15px; font-size: 1.1rem; }
+        .add-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+        .form-group select, .form-group input { padding: 8px 12px; border-radius: 6px; border: 1px solid #2a3a4a; background: #0f1923; color: #e0e0e0; font-size: 0.9rem; }
+        .form-group input[type="text"] { width: 140px; }
+        .form-group input[type="number"] { width: 110px; }
+        button { padding: 8px 16px; border-radius: 6px; border: none; background: #00d4aa; color: #0f1923; font-weight: bold; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+        button:hover { background: #00b894; }
+        .btn-remove { background: #e74c3c; color: white; padding: 3px 7px; font-size: 0.53rem; }
+        .btn-remove:hover { background: #c0392b; }
+        .btn-edit { background: #f39c12; color: white; padding: 4px 10px; font-size: 0.75rem; margin-right: 4px; }
+        .btn-edit:hover { background: #e67e22; }
+        .sections { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
+        .section { background: #1a2736; border-radius: 12px; padding: 20px; border: 1px solid #2a3a4a; }
+        .section h2 { color: #00d4aa; margin-bottom: 15px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+        .section h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: #00d4aa; animation: pulse 2s infinite; }
+        .section h2 .toggle-arrow { font-size: 0.9rem; transition: transform 0.3s; margin-left: auto; }
+        .section h2 .toggle-arrow.collapsed { transform: rotate(-90deg); }
+        .section-content { overflow: hidden; }
+        .section-content.hidden { display: none; }
+        .column-config { background:#0f1923; border:1px solid #2a3a4a; border-radius:8px; padding:12px; margin-bottom:12px; }
+        .column-config.hidden { display: none; }
+        .column-config label { display:inline-flex; align-items:center; gap:4px; font-size:0.8rem; margin-right:12px; cursor:pointer; }
+        .subsection-label { font-size: 0.75rem; color: #888; text-transform: uppercase; padding: 4px 0; margin: 16px 0 6px; border-top: 1px solid #2a3a4a; }
+        .subsection-label:first-child { margin-top: 0; border-top: none; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 8px 12px; color: #888; font-size: 0.75rem; text-transform: uppercase; border-bottom: 1px solid #2a3a4a; }
+        td { padding: 10px 12px; border-bottom: 1px solid #1e2d3d; font-size: 0.9rem; }
+        .price { font-weight: bold; font-family: 'Courier New', monospace; }
+        .price-up { color: #00d4aa; }
+        .price-down { color: #e74c3c; }
+        .alarm-triggered { background: #1a3d2a !important; animation: alarm-flash-green 1s infinite; }
+        .alarm-triggered td:first-child::before { content: "🟢 "; }
+        @keyframes alarm-flash-green { 0%, 100% { background: #1a3d2a; } 50% { background: #2a4d3a; } }
+        .target-reached { background: #2a2a3d !important; animation: alarm-flash-white 1s infinite; }
+        .target-reached td:first-child::before { content: "⚪ "; }
+        @keyframes alarm-flash-white { 0%, 100% { background: #2a2a3d; } 50% { background: #3d3d4d; } }
+        .config-error { background: #3d1a1a !important; animation: alarm-flash-red 1s infinite; }
+        .config-error td:first-child::before { content: "🔴 "; }
+        @keyframes alarm-flash-red { 0%, 100% { background: #3d1a1a; } 50% { background: #4d2a2a; } }
+        .alarm-badge { display: inline-block; background: #00d4aa; color: #0f1923; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: bold; }
+        .change-positive { color: #00d4aa; }
+        .change-negative { color: #e74c3c; }
+        .discount-val { color: #f1c40f; font-weight: bold; }
+        .empty-msg { color: #555; font-style: italic; padding: 20px; text-align: center; }
+        .status-bar { max-width: 900px; margin: 20px auto 0; text-align: center; font-size: 0.75rem; color: #555; }
+        .status-bar .connected { color: #00d4aa; }
+        .status-bar .error { color: #e74c3c; }
+        @media (max-width: 600px) { .add-form { flex-direction: column; } .form-group input[type="text"], .form-group input[type="number"] { width: 100%; } }
+        /* Auth styles */
+        .auth-container { max-width: 400px; margin: 80px auto; background: #1a2736; padding: 30px; border-radius: 12px; border: 1px solid #2a3a4a; text-align: center; }
+        .auth-container h2 { color: #00d4aa; margin-bottom: 20px; }
+        .auth-container input { width: 100%; padding: 10px 14px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #2a3a4a; background: #0f1923; color: #e0e0e0; font-size: 0.9rem; }
+        .auth-container button { width: 100%; margin-bottom: 10px; }
+        .auth-container .auth-toggle { color: #00d4aa; cursor: pointer; font-size: 0.85rem; }
+        .auth-container .auth-error { color: #e74c3c; font-size: 0.8rem; margin-top: 8px; }
+        .auth-container .auth-info { color: #888; font-size: 0.8rem; margin-bottom: 15px; }
+        .user-bar { max-width: 900px; margin: 0 auto 10px; text-align: right; font-size: 0.75rem; color: #666; }
+        .user-bar a { color: #00d4aa; cursor: pointer; margin-left: 10px; }
+        #app-container { display: none; }
+    </style>
+</head>
+<body>
+    <!-- AUTH SCREEN -->
+    <div id="auth-container" class="auth-container">
+        <h1 style="color:#00d4aa;margin-bottom:5px;">🐎 Asset Scout</h1>
+        <p class="auth-info">Global Value Seeker</p>
+        <h2 id="auth-title">Login</h2>
+        <input type="email" id="auth-email" placeholder="Email">
+        <input type="password" id="auth-password" placeholder="Password">
+        <button onclick="authAction()">Login</button>
+        <p><span class="auth-toggle" onclick="toggleAuthMode()">Don't have an account? Sign up</span></p>
+        <p class="auth-error" id="auth-error"></p>
+    </div>
+
+    <!-- MAIN APP (hidden until logged in) -->
+    <div id="app-container">
+    <div class="user-bar"><span id="user-email"></span><a onclick="logout()">Logout</a></div>
+    <h1>🐎 Asset Scout</h1>
+    <p class="subtitle">Global Value Seeker</p>
+
+    <div class="controls">
+        <h2 style="display:flex;align-items:center;justify-content:space-between;">
+            Add Asset to Track
+            <button onclick="toggleAllWindows()" id="toggle-all-btn" style="font-size:0.75rem;padding:5px 12px;background:#2a3a4a;color:#00d4aa;border:1px solid #00d4aa;">Expand All</button>
+        </h2>
+        <div class="add-form">
+            <div class="form-group">
+                <label>Market</label>
+                <select id="market-select">
+                    <option value="crypto">Crypto</option>
+                    <option value="us">US Stock</option>
+                    <option value="br">BR Stock</option>
+                    <option value="brfund">BR Fund</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Symbol</label>
+                <input type="text" id="symbol-input" placeholder="e.g. BTCUSDT, AAPL, PETR4">
+            </div>
+            <button onclick="addAsset()">Add</button>
+        </div>
+        <p style="margin-top:10px; font-size:0.7rem; color:#666;">
+            Crypto: Binance pairs (BTCUSDT, ETHUSDT) | US: ticker (AAPL, MSFT) | BR: ticker (PETR4, VALE3)
+        </p>
+    </div>
+
+    <div class="sections">
+        <div class="section" id="section-currencies">
+            <h2 onclick="toggleSection('currencies')"><span class="dot"></span> Currencies <span style="background:#3d1a5e;color:#c084fc;font-size:0.65rem;padding:2px 8px;border-radius:4px;margin-left:4px;">Money Never Sleeps</span> <span class="toggle-arrow" id="arrow-currencies">▼</span></h2>
+            <div class="section-content" id="content-currencies">
+                <div class="subsection-label">🌍 Foreign Exchange</div>
+                <div id="fx-table-container"></div>
+                <div class="subsection-label">₿ Crypto <span style="cursor:pointer;font-size:0.8rem;margin-left:4px;" onclick="toggleColumnConfig('crypto')">⚙️</span></div>
+                <div class="column-config hidden" id="colconfig-crypto"></div>
+                <div id="crypto-table-container"></div>
+            </div>
+        </div>
+        <div class="section" id="section-us">
+            <h2 onclick="toggleSection('us')"><span class="dot"></span> US Stocks <span id="us-market-tag"></span> <span style="cursor:pointer;font-size:0.8rem;margin-left:auto;" onclick="event.stopPropagation();toggleColumnConfig('us')">⚙️</span><span class="toggle-arrow" id="arrow-us" style="margin-left:8px;">▼</span></h2>
+            <div class="column-config hidden" id="colconfig-us"></div>
+            <div class="section-content" id="content-us"><div id="us-table-container"></div></div>
+        </div>
+        <div class="section" id="section-br">
+            <h2 onclick="toggleSection('br')"><span class="dot"></span> Brazilian Stocks <span id="br-market-tag"></span> <span style="cursor:pointer;font-size:0.8rem;margin-left:auto;" onclick="event.stopPropagation();toggleColumnConfig('br')">⚙️</span><span class="toggle-arrow" id="arrow-br" style="margin-left:8px;">▼</span></h2>
+            <div class="column-config hidden" id="colconfig-br"></div>
+            <div class="section-content" id="content-br"><div id="br-table-container"></div></div>
+        </div>
+        <div class="section" id="section-brfund">
+            <h2 onclick="toggleSection('brfund')"><span class="dot"></span> Brazilian Funds <span id="brfund-market-tag"></span> <span style="cursor:pointer;font-size:0.8rem;margin-left:auto;" onclick="event.stopPropagation();toggleColumnConfig('brfund')">⚙️</span><span class="toggle-arrow" id="arrow-brfund" style="margin-left:8px;">▼</span></h2>
+            <div class="column-config hidden" id="colconfig-brfund"></div>
+            <div class="section-content" id="content-brfund"><div id="brfund-table-container"></div></div>
+        </div>
+        <div class="section" id="section-markets">
+            <h2 onclick="toggleSection('markets')"><span class="dot"></span> Markets <span style="background:#1a2a6e;color:#fbbf24;font-size:0.65rem;padding:2px 8px;border-radius:4px;margin-left:8px;font-weight:bold;">Global Indexes</span> <span class="toggle-arrow" id="arrow-markets">▼</span></h2>
+            <div class="section-content" id="content-markets"><div id="markets-table-container"></div></div>
+        </div>
+        <div class="section" id="section-commodities">
+            <h2 onclick="toggleSection('commodities')"><span class="dot"></span> Commodities <span style="background:#fbbf24;color:#166534;font-size:0.65rem;padding:2px 8px;border-radius:4px;margin-left:8px;font-weight:bold;">BR Relevant</span> <span class="toggle-arrow" id="arrow-commodities">▼</span></h2>
+            <div class="section-content" id="content-commodities"><div id="commodities-table-container"></div></div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">Initializing...</div>
+
+    <div class="sections" style="margin-top:25px;">
+        <div class="section">
+            <h2 onclick="toggleSection('settings')">⚙️ Settings <span class="toggle-arrow collapsed" id="arrow-settings">▼</span></h2>
+            <div class="section-content hidden" id="content-settings">
+                <p style="font-size:0.7rem; color:#888; margin-bottom:10px;">
+                    BR stocks/funds: optional free token from <a href="https://brapi.dev" target="_blank" style="color:#00d4aa;">brapi.dev</a> (improves reliability)
+                </p>
+                <div class="add-form">
+                    <div class="form-group">
+                        <label>Brapi Token (BR)</label>
+                        <input type="text" id="brapi-key" placeholder="Your token (optional)" style="width:260px;">
+                    </div>
+                    <button onclick="saveApiKeys()">Save</button>
+                </div>
+                <p id="key-status" style="margin-top:8px; font-size:0.7rem; color:#00d4aa;"></p>
+                <p style="margin-top:10px; font-size:0.7rem; color:#666;">
+                    Crypto: Binance API (no key) | US Stocks: Yahoo Finance (no key) | BR: Brapi (optional token)
+                </p>
+                <div style="margin-top:15px; padding-top:15px; border-top:1px solid #2a3a4a;">
+                    <label style="font-size:0.75rem; color:#888; text-transform:uppercase; display:block; margin-bottom:6px;">Visible Windows & Order</label>
+                    <p style="font-size:0.7rem;color:#666;margin-bottom:10px;">Drag to reorder. Uncheck to hide.</p>
+                    <div id="visibility-checkboxes" style="display:flex;flex-direction:column;gap:6px;"></div>
+                </div>
+                <div style="margin-top:15px; padding-top:15px; border-top:1px solid #2a3a4a;">
+                    <label style="font-size:0.75rem; color:#888; text-transform:uppercase; display:block; margin-bottom:8px;">Backup & Restore</label>
+                    <button onclick="exportSettings()" style="margin-right:8px;">Export Settings</button>
+                    <button onclick="document.getElementById('import-file').click()">Import Settings</button>
+                    <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importSettings(event)">
+                    <p id="backup-status" style="margin-top:6px; font-size:0.7rem; color:#888;"></p>
+                </div>
+                <div style="margin-top:15px; padding-top:15px; border-top:1px solid #2a3a4a;">
+                    <label style="font-size:0.75rem; color:#888; text-transform:uppercase; display:block; margin-bottom:10px;">📖 How to Use</label>
+                    <div style="font-size:0.8rem; color:#aaa; line-height:1.6;">
+                        <p style="margin-bottom:8px;"><strong style="color:#00d4aa;">Adding Assets:</strong> Select a market (Crypto, US, BR Stock, BR Fund), type the symbol, and click Add. The price will load automatically.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#00d4aa;">Entry Price:</strong> Click directly on the Entry Price cell in the table to set the price you consider a good buy. This is the price level you want to enter a position at.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#00d4aa;">Target Price:</strong> Click directly on the Target Price cell to set your sell/exit target. This is the price you expect the asset to reach.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#f1c40f;">Discount Column:</strong> Shows how far below your Entry Price the current price is. A negative value (yellow) means the asset is trading below your entry — a potential buying opportunity. Click the column header to sort assets by discount.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#00d4aa;">Upside Column:</strong> Shows the potential gain from the current price to your Target Price. Click the column header to sort assets by upside potential.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#4ade80;">Green row glow 🟢:</strong> When the current price drops below your Entry Price, the row lights up green to signal a buying opportunity.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#e0e0e0;">White row glow ⚪:</strong> When the current price reaches or exceeds your Target Price, the row lights up white to signal a sell/take profit opportunity.</p>
+                        <p style="margin-bottom:8px;"><strong style="color:#f87171;">Red row glow 🔴:</strong> When the price is simultaneously below Entry Price and above Target Price, it means the values were entered incorrectly. Review and correct your Entry/Target values.</p>
+                        <p><strong style="color:#e0e0e0;">Tips:</strong> Use Expand All / Collapse All to quickly navigate. Drag windows and columns in Settings to customize your layout. All data is saved automatically.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== STATE =====
+        let assets = JSON.parse(localStorage.getItem('trackerAssets') || '[]');
+        let prices = JSON.parse(localStorage.getItem('trackerPrices') || '{}');
+        let alarmTriggered = {};
+        let apiKeys = JSON.parse(localStorage.getItem('trackerApiKeys') || '{}');
+
+        function savePrices() { localStorage.setItem('trackerPrices', JSON.stringify(prices)); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (apiKeys.brapi) document.getElementById('brapi-key').value = apiKeys.brapi;
+            if (apiKeys.brapi) document.getElementById('key-status').textContent = '✓ Token loaded';
+            initVisibilityControls();
+            initColumnControls();
+            applyWindowVisibility();
+        });
+
+        function saveApiKeys() {
+            const brKey = document.getElementById('brapi-key').value.trim();
+            if (brKey) apiKeys.brapi = brKey; else delete apiKeys.brapi;
+            localStorage.setItem('trackerApiKeys', JSON.stringify(apiKeys));
+            document.getElementById('key-status').textContent = brKey ? '✓ Token saved!' : '✓ Token removed';
+            startBRPolling();
+        }
+
+        function saveAssets() { localStorage.setItem('trackerAssets', JSON.stringify(assets)); }
+
+        function exportSettings() {
+            const data = { assets, apiKeys, exportDate: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = 'asset-scout-settings.json'; a.click();
+            document.getElementById('backup-status').textContent = '✓ Exported!';
+            document.getElementById('backup-status').style.color = '#00d4aa';
+        }
+
+        function importSettings(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.assets) { assets = data.assets; saveAssets(); }
+                    if (data.apiKeys) { apiKeys = data.apiKeys; localStorage.setItem('trackerApiKeys', JSON.stringify(apiKeys)); }
+                    document.getElementById('backup-status').textContent = '✓ Imported!';
+                    document.getElementById('backup-status').style.color = '#00d4aa';
+                    location.reload();
+                } catch (err) {
+                    document.getElementById('backup-status').textContent = '✗ Invalid file.';
+                    document.getElementById('backup-status').style.color = '#e74c3c';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ===== WINDOW VISIBILITY & ORDER =====
+        const DEFAULT_WINDOWS = [
+            { id: 'currencies',  label: 'Currencies' },
+            { id: 'us',          label: 'US Stocks' },
+            { id: 'br',          label: 'Brazilian Stocks' },
+            { id: 'brfund',      label: 'Brazilian Funds' },
+            { id: 'markets',     label: 'Markets' },
+            { id: 'commodities', label: 'Commodities' },
+        ];
+
+        let windowPrefs = JSON.parse(localStorage.getItem('windowPrefs') || 'null');
+        if (!windowPrefs) {
+            windowPrefs = DEFAULT_WINDOWS.map(w => ({ ...w, visible: true }));
+        } else {
+            // Merge any new windows not yet in prefs
+            for (const dw of DEFAULT_WINDOWS) {
+                if (!windowPrefs.find(w => w.id === dw.id)) {
+                    windowPrefs.push({ ...dw, visible: true });
+                }
+            }
+        }
+
+        function saveWindowPrefs() {
+            localStorage.setItem('windowPrefs', JSON.stringify(windowPrefs));
+        }
+
+        function applyWindowVisibility() {
+            const sectionsContainer = document.querySelector('.sections');
+            // Reorder DOM sections to match windowPrefs order
+            for (const w of [...windowPrefs].reverse()) {
+                const section = document.getElementById('section-' + w.id);
+                if (section) sectionsContainer.prepend(section);
+            }
+            // Show/hide and collapse all on startup
+            for (const w of windowPrefs) {
+                const section = document.getElementById('section-' + w.id);
+                if (section) section.style.display = w.visible ? '' : 'none';
+                const content = document.getElementById('content-' + w.id);
+                const arrow = document.getElementById('arrow-' + w.id);
+                if (content) { content.classList.add('hidden'); }
+                if (arrow) { arrow.classList.add('collapsed'); }
+            }
+        }
+
+        function initVisibilityControls() {
+            const container = document.getElementById('visibility-checkboxes');
+            container.innerHTML = '';
+            for (const w of windowPrefs) {
+                const item = document.createElement('div');
+                item.dataset.id = w.id;
+                item.draggable = true;
+                item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;background:#0f1923;border-radius:6px;border:1px solid #2a3a4a;cursor:grab;user-select:none;';
+                item.innerHTML = `
+                    <span style="color:#555;font-size:0.8rem;">⠿</span>
+                    <input type="checkbox" ${w.visible ? 'checked' : ''} onchange="setWindowVisible('${w.id}', this.checked)" style="accent-color:#00d4aa;width:14px;height:14px;cursor:pointer;">
+                    <span style="font-size:0.85rem;">${w.label}</span>`;
+                container.appendChild(item);
+            }
+            initDragToReorder(container);
+        }
+
+        function setWindowVisible(id, visible) {
+            const w = windowPrefs.find(x => x.id === id);
+            if (w) {
+                w.visible = visible;
+                saveWindowPrefs();
+                const section = document.getElementById('section-' + id);
+                if (section) {
+                    section.style.display = visible ? '' : 'none';
+                    // New windows appear collapsed
+                    if (visible) {
+                        const content = document.getElementById('content-' + id);
+                        const arrow = document.getElementById('arrow-' + id);
+                        if (content && !content.classList.contains('hidden')) {
+                            content.classList.add('hidden');
+                            if (arrow) arrow.classList.add('collapsed');
+                        }
+                    }
+                }
+            }
+        }
+
+        function initDragToReorder(container) {
+            let dragEl = null;
+            container.addEventListener('dragstart', e => {
+                dragEl = e.target.closest('[data-id]');
+                setTimeout(() => dragEl && (dragEl.style.opacity = '0.4'), 0);
+            });
+            container.addEventListener('dragend', () => {
+                if (dragEl) { dragEl.style.opacity = ''; dragEl = null; }
+            });
+            container.addEventListener('dragover', e => {
+                e.preventDefault();
+                const target = e.target.closest('[data-id]');
+                if (target && target !== dragEl) {
+                    const rect = target.getBoundingClientRect();
+                    const after = e.clientY > rect.top + rect.height / 2;
+                    container.insertBefore(dragEl, after ? target.nextSibling : target);
+                }
+            });
+            container.addEventListener('drop', e => {
+                e.preventDefault();
+                // Update windowPrefs order to match new DOM order
+                const newOrder = [...container.querySelectorAll('[data-id]')].map(el => el.dataset.id);
+                windowPrefs.sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
+                saveWindowPrefs();
+                applyWindowVisibility();
+            });
+        }
+
+        let allCollapsed = true;
+        function toggleAllWindows() {
+            allCollapsed = !allCollapsed;
+            document.getElementById('toggle-all-btn').textContent = allCollapsed ? 'Expand All' : 'Collapse All';
+            for (const w of windowPrefs) {
+                if (!w.visible) continue;
+                const content = document.getElementById('content-' + w.id);
+                const arrow = document.getElementById('arrow-' + w.id);
+                if (content) {
+                    if (allCollapsed) { content.classList.add('hidden'); arrow && arrow.classList.add('collapsed'); }
+                    else { content.classList.remove('hidden'); arrow && arrow.classList.remove('collapsed'); }
+                }
+            }
+        }
+
+        // ===== COLUMN VISIBILITY & ORDER (per window) =====
+        const DEFAULT_COLUMNS = [
+            { id: 'symbol',   label: 'Symbol',       fixed: true },
+            { id: 'price',    label: 'Price',        fixed: true },
+            { id: 'entry',    label: 'Entry Price' },
+            { id: 'discount', label: 'Discount' },
+            { id: 'target',   label: 'Target Price' },
+            { id: 'upside',   label: 'Upside' },
+            { id: 'change',   label: 'Change' },
+            { id: 'updated',  label: 'Updated' },
+            { id: 'actions',  label: 'Actions',      fixed: true },
+        ];
+
+        let perWindowColumns = JSON.parse(localStorage.getItem('perWindowColumns') || '{}');
+
+        function getColumnPrefs(market) {
+            if (!perWindowColumns[market]) {
+                perWindowColumns[market] = DEFAULT_COLUMNS.map(c => ({ ...c, visible: true }));
+            } else {
+                // Merge any new columns not yet present
+                for (const dc of DEFAULT_COLUMNS) {
+                    if (!perWindowColumns[market].find(c => c.id === dc.id)) {
+                        perWindowColumns[market].push({ ...dc, visible: true });
+                    }
+                }
+            }
+            return perWindowColumns[market];
+        }
+
+        function saveColumnPrefs() { localStorage.setItem('perWindowColumns', JSON.stringify(perWindowColumns)); }
+
+        function getVisibleColumns(market) { return getColumnPrefs(market).filter(c => c.visible); }
+
+        function toggleColumnConfig(market) {
+            const panel = document.getElementById('colconfig-' + market);
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) renderColumnConfig(market);
+        }
+
+        function renderColumnConfig(market) {
+            const panel = document.getElementById('colconfig-' + market);
+            const cols = getColumnPrefs(market);
+            let html = '<p style="font-size:0.7rem;color:#666;margin-bottom:8px;">Drag to reorder. Uncheck to hide.</p><div class="col-sortable" data-market="' + market + '" style="display:flex;flex-direction:column;gap:4px;">';
+            for (const c of cols) {
+                const disabled = c.fixed ? 'disabled' : '';
+                const checked = c.visible ? 'checked' : '';
+                const draggable = c.fixed ? '' : 'draggable="true"';
+                html += `<div data-colid="${c.id}" ${draggable} style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#1a2736;border-radius:4px;border:1px solid #2a3a4a;${c.fixed ? 'opacity:0.5;' : 'cursor:grab;'}user-select:none;">
+                    <span style="color:#555;font-size:0.75rem;">${c.fixed ? '🔒' : '⠿'}</span>
+                    <input type="checkbox" ${checked} ${disabled} onchange="setColVisible('${market}','${c.id}',this.checked)" style="accent-color:#00d4aa;">
+                    <span style="font-size:0.8rem;">${c.label}</span>
+                </div>`;
+            }
+            html += '</div>';
+            panel.innerHTML = html;
+            initColDrag(panel.querySelector('.col-sortable'), market);
+        }
+
+        function initColDrag(container, market) {
+            let dragEl = null;
+            container.addEventListener('dragstart', e => {
+                dragEl = e.target.closest('[data-colid]');
+                if (dragEl) setTimeout(() => dragEl.style.opacity = '0.4', 0);
+            });
+            container.addEventListener('dragend', () => { if (dragEl) { dragEl.style.opacity = ''; dragEl = null; } });
+            container.addEventListener('dragover', e => {
+                e.preventDefault();
+                const target = e.target.closest('[data-colid]');
+                if (target && target !== dragEl && target.hasAttribute('draggable')) {
+                    const rect = target.getBoundingClientRect();
+                    const after = e.clientY > rect.top + rect.height / 2;
+                    container.insertBefore(dragEl, after ? target.nextSibling : target);
+                }
+            });
+            container.addEventListener('drop', e => {
+                e.preventDefault();
+                const newOrder = [...container.querySelectorAll('[data-colid]')].map(el => el.dataset.colid);
+                perWindowColumns[market].sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
+                saveColumnPrefs(); renderAll();
+            });
+        }
+
+        function setColVisible(market, colId, visible) {
+            const cols = getColumnPrefs(market);
+            const c = cols.find(x => x.id === colId);
+            if (c && !c.fixed) { c.visible = visible; saveColumnPrefs(); renderAll(); }
+        }
+
+        // Remove old global columnPrefs references
+        function initColumnControls() {} // no-op, now per-window
+
+        // ===== UI =====
+        function toggleSection(id) {
+            const content = document.getElementById('content-' + id);
+            const arrow = document.getElementById('arrow-' + id);
+            const colconfig = document.getElementById('colconfig-' + id);
+            content.classList.toggle('hidden');
+            arrow.classList.toggle('collapsed');
+            // Close column config when collapsing the section
+            if (content.classList.contains('hidden') && colconfig && !colconfig.classList.contains('hidden')) {
+                colconfig.classList.add('hidden');
+            }
+        }
+
+        function addAsset() {
+            const market = document.getElementById('market-select').value;
+            const symbol = document.getElementById('symbol-input').value.trim().toUpperCase();
+            if (!symbol) return;
+            if (assets.find(a => a.symbol === symbol && a.market === market)) { alert('Already tracked!'); return; }
+            assets.push({ market, symbol, alarm: null, target: null });
+            saveAssets(); document.getElementById('symbol-input').value = '';
+            renderAll(); fetchSingleAsset(market, symbol);
+        }
+
+        function removeAsset(market, symbol) {
+            assets = assets.filter(a => !(a.symbol === symbol && a.market === market));
+            delete prices[symbol]; delete alarmTriggered[symbol]; saveAssets(); renderAll();
+        }
+
+        function editAlarm(market, symbol) {
+            const asset = assets.find(a => a.symbol === symbol && a.market === market);
+            if (!asset) return;
+            const newVal = prompt(`Entry Price for ${symbol} (empty to remove):`, asset.alarm || '');
+            if (newVal === null) return;
+            if (newVal.trim() === '') { asset.alarm = null; alarmTriggered[symbol] = false; }
+            else { const p = parseFloat(newVal); if (!isNaN(p) && p > 0) { asset.alarm = p; alarmTriggered[symbol] = false; } }
+            saveAssets(); renderAll();
+        }
+
+        function editTarget(market, symbol) {
+            const asset = assets.find(a => a.symbol === symbol && a.market === market);
+            if (!asset) return;
+            const newVal = prompt(`Target Price for ${symbol} (empty to remove):`, asset.target || '');
+            if (newVal === null) return;
+            if (newVal.trim() === '') { asset.target = null; }
+            else { const p = parseFloat(newVal); if (!isNaN(p) && p > 0) { asset.target = p; } }
+            saveAssets(); renderAll();
+        }
+
+        // ===== RENDER =====
+        function renderAll() {
+            renderTable('crypto', 'crypto-table-container');
+            renderTable('us', 'us-table-container');
+            renderTable('br', 'br-table-container');
+            renderTable('brfund', 'brfund-table-container');
+            savePrices();
+        }
+
+        // Sort state per market
+        let sortState = {}; // { market: { col: 'discount'|'upside', dir: 'asc'|'desc' } }
+
+        function toggleSort(market, col) {
+            if (!sortState[market] || sortState[market].col !== col) {
+                sortState[market] = { col, dir: 'desc' };
+            } else {
+                sortState[market].dir = sortState[market].dir === 'desc' ? 'asc' : 'desc';
+            }
+            renderAll();
+        }
+
+        function renderTable(market, containerId) {
+            const container = document.getElementById(containerId);
+            const marketAssets = assets.filter(a => a.market === market);
+            if (marketAssets.length === 0) { container.innerHTML = '<p class="empty-msg">No assets tracked.</p>'; return; }
+
+            const withData = marketAssets.map(asset => {
+                const p = prices[asset.symbol];
+                let discount = null;
+                if (p && asset.alarm) discount = ((asset.alarm - p.price) / asset.alarm) * 100;
+                let upside = null;
+                if (p && asset.target && p.price) upside = ((asset.target - p.price) / p.price) * -100;
+                return { asset, discount, upside };
+            });
+
+            // Sort based on active sort column
+            const sort = sortState[market];
+            if (sort) {
+                const dir = sort.dir === 'asc' ? 1 : -1;
+                withData.sort((a, b) => {
+                    const aVal = sort.col === 'discount' ? a.discount : a.upside;
+                    const bVal = sort.col === 'discount' ? b.discount : b.upside;
+                    if (aVal === null && bVal === null) return 0;
+                    if (aVal === null) return 1;
+                    if (bVal === null) return -1;
+                    return (aVal - bVal) * dir;
+                });
+            } else {
+                // Default: biggest discount first
+                withData.sort((a, b) => {
+                    if (a.discount !== null && b.discount !== null) return b.discount - a.discount;
+                    if (a.discount !== null) return -1;
+                    if (b.discount !== null) return 1;
+                    return 0;
+                });
+            }
+
+            const discArrow = sort && sort.col === 'discount' ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+            const upArrow = sort && sort.col === 'upside' ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+            const discStyle = sort && sort.col === 'discount' ? 'color:#f1c40f;' : '';
+            const upStyle = sort && sort.col === 'upside' ? 'color:#00d4aa;' : '';
+
+            const cols = getVisibleColumns(market);
+
+            // Build header
+            let html = '<table><thead><tr>';
+            for (const col of cols) {
+                if (col.id === 'discount') html += `<th style="cursor:pointer;${discStyle}" onclick="toggleSort('${market}','discount')">Discount${discArrow}</th>`;
+                else if (col.id === 'upside') html += `<th style="cursor:pointer;${upStyle}" onclick="toggleSort('${market}','upside')">Upside${upArrow}</th>`;
+                else if (col.id === 'actions') html += '<th></th>';
+                else html += `<th>${col.label}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+
+            for (const { asset, discount, upside } of withData) {
+                const p = prices[asset.symbol];
+                const below = discount !== null && discount > 0;
+                const targetHit = p && asset.target && p.price >= asset.target;
+                const configError = below && targetHit; // entry > target = wrong config
+                const rowClass = configError ? 'config-error' : (targetHit ? 'target-reached' : (below ? 'alarm-triggered' : ''));
+                const priceVal = p && !p.invalid ? formatPrice(p.price, market) : '—';
+                const changeVal = p && p.change !== null ? (p.change >= 0 ? '+' : '') + p.change.toFixed(2) + '%' : '—';
+                const changeClass = p && p.change !== null ? (p.change >= 0 ? 'change-positive' : 'change-negative') : '';
+                const priceClass = p ? (p.price >= (p.prevPrice || p.price) ? 'price-up' : 'price-down') : '';
+                const updated = p ? timeAgo(p.lastUpdate) : '—';
+                const entryDisp = asset.alarm ? formatPrice(asset.alarm, market) : '—';
+                const targetDisp = asset.target ? formatPrice(asset.target, market) : '—';
+                let discDisp = '—', discClass = '';
+                if (discount !== null) {
+                    if (discount > 0) { discDisp = '-' + discount.toFixed(1) + '%'; discClass = 'discount-val'; }
+                    else { discDisp = '+' + Math.abs(discount).toFixed(1) + '%'; discClass = 'change-positive'; }
+                }
+                let upsideDisp = '—', upsideClass = '';
+                if (upside !== null) {
+                    upsideDisp = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '%';
+                    upsideClass = upside >= 0 ? 'change-positive' : 'change-negative';
+                }
+                const invalid = p && p.invalid ? '<span style="background:#e74c3c;color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;margin-left:6px;">✕</span>' : '';
+
+                html += `<tr class="${rowClass}">`;
+                for (const col of cols) {
+                    if (col.id === 'symbol') html += `<td><strong>${asset.symbol}</strong>${invalid}</td>`;
+                    else if (col.id === 'price') html += `<td class="price ${priceClass}">${priceVal}</td>`;
+                    else if (col.id === 'entry') html += `<td style="cursor:pointer;" onclick="editAlarm('${asset.market}','${asset.symbol}')">${entryDisp}</td>`;
+                    else if (col.id === 'discount') html += `<td class="${discClass}">${discDisp}</td>`;
+                    else if (col.id === 'target') html += `<td style="cursor:pointer;" onclick="editTarget('${asset.market}','${asset.symbol}')">${targetDisp}</td>`;
+                    else if (col.id === 'upside') html += `<td class="${upsideClass}">${upsideDisp}</td>`;
+                    else if (col.id === 'change') html += `<td class="${changeClass}">${changeVal}</td>`;
+                    else if (col.id === 'updated') html += `<td>${updated}</td>`;
+                    else if (col.id === 'actions') html += `<td><button class="btn-remove" onclick="removeAsset('${asset.market}','${asset.symbol}')">✕</button></td>`;
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function formatPrice(price, market) {
+            if (market === 'br' || market === 'brfund') return 'R$ ' + price.toFixed(2);
+            return '$ ' + (price >= 1 ? price.toFixed(2) : price.toFixed(6));
+        }
+        function timeAgo(ts) {
+            const d = Math.floor((Date.now() - ts) / 1000);
+            if (d < 5) return 'just now'; if (d < 60) return d + 's ago';
+            if (d < 3600) return Math.floor(d/60) + 'm ago'; return Math.floor(d/3600) + 'h ago';
+        }
+        function checkAlarm(symbol) {
+            const asset = assets.find(a => a.symbol === symbol);
+            if (!asset || !asset.alarm) return;
+            const p = prices[symbol]; if (!p) return;
+            if (p.price <= asset.alarm && !alarmTriggered[symbol]) { alarmTriggered[symbol] = true; }
+            else if (p.price > asset.alarm) { alarmTriggered[symbol] = false; }
+        }
+        function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ===== FX RATES =====
+        const CURRENCIES = [
+            { symbol: 'DX-Y.NYB', name: 'US Dollar Index' },
+            { symbol: 'BRL=X',    name: 'USD/BRL' },
+            { symbol: 'USDEUR=X', name: 'USD/EUR' },
+            { symbol: 'USDGBP=X', name: 'USD/GBP' },
+            { symbol: 'USDJPY=X', name: 'USD/JPY' },
+            { symbol: 'USDCNY=X', name: 'USD/CNY' },
+        ];
+        let fxInterval = null;
+
+        function startFXPolling() {
+            async function fetchFX() {
+                for (let i = 0; i < CURRENCIES.length; i++) {
+                    const fx = CURRENCIES[i];
+                    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${fx.symbol}?interval=1d&range=2d`;
+                    try {
+                        const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                        if (!resp.ok) continue;
+                        const data = await resp.json();
+                        if (data.chart && data.chart.result && data.chart.result[0]) {
+                            const meta = data.chart.result[0].meta;
+                            const price = meta.regularMarketPrice;
+                            const prevClose = meta.chartPreviousClose || meta.previousClose;
+                            const change = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+                            const prevPrice = prices[fx.symbol] ? prices[fx.symbol].price : price;
+                            prices[fx.symbol] = { price, prevPrice, change, lastUpdate: Date.now() };
+                        }
+                    } catch (e) { console.warn('FX error for', fx.symbol, e); }
+                    if (i < CURRENCIES.length - 1) await delay(1000);
+                }
+                renderFX();
+            }
+            fetchFX();
+            if (fxInterval) clearInterval(fxInterval);
+            fxInterval = setInterval(fetchFX, 120000);
+        }
+
+        function renderFX() {
+            const container = document.getElementById('fx-table-container');
+            let html = `<table><thead><tr><th>Pair</th><th>Price</th><th>Change</th><th>Updated</th></tr></thead><tbody>`;
+            for (const fx of CURRENCIES) {
+                const p = prices[fx.symbol];
+                const priceVal = p ? p.price.toFixed(4) : '—';
+                const changeVal = p ? (p.change >= 0 ? '+' : '') + p.change.toFixed(2) + '%' : '—';
+                const changeClass = p ? (p.change >= 0 ? 'change-positive' : 'change-negative') : '';
+                const updated = p ? timeAgo(p.lastUpdate) : '—';
+                html += `<tr>
+                    <td><strong>${fx.name}</strong> <span style="color:#666;font-size:0.75rem;">${fx.symbol}</span></td>
+                    <td class="price">${priceVal}</td>
+                    <td class="${changeClass}">${changeVal}</td>
+                    <td>${updated}</td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ===== CRYPTO via Binance =====
+        let cryptoInterval = null;
+
+        function startCryptoPolling() {
+            const cryptoAssets = assets.filter(a => a.market === 'crypto');
+            if (cryptoAssets.length === 0) return;
+            async function fetchCrypto() {
+                const endpoints = [
+                    'https://api.binance.us/api/v3/ticker/24hr',
+                    'https://api1.binance.com/api/v3/ticker/24hr',
+                    'https://api2.binance.com/api/v3/ticker/24hr',
+                    'https://api3.binance.com/api/v3/ticker/24hr'
+                ];
+                for (const endpoint of endpoints) {
+                    try {
+                        const resp = await fetch(endpoint);
+                        if (!resp.ok) continue;
+                        const allTickers = await resp.json();
+                        let found = 0;
+                        for (const asset of cryptoAssets) {
+                            const ticker = allTickers.find(t => t.symbol === asset.symbol);
+                            if (ticker) {
+                                const price = parseFloat(ticker.lastPrice);
+                                const change = parseFloat(ticker.priceChangePercent) || 0;
+                                const prevPrice = prices[asset.symbol] ? prices[asset.symbol].price : price;
+                                prices[asset.symbol] = { price, prevPrice, change, lastUpdate: Date.now() };
+                                checkAlarm(asset.symbol); found++;
+                            }
+                        }
+                        if (found > 0) { renderAll(); return; }
+                    } catch (e) { console.warn('Crypto endpoint failed:', endpoint, e.message); }
+                }
+                renderAll();
+            }
+            fetchCrypto();
+            if (cryptoInterval) clearInterval(cryptoInterval);
+            cryptoInterval = setInterval(fetchCrypto, 30000);
+        }
+
+        // ===== US STOCKS =====
+        let usInterval = null, usFetching = false;
+
+        function startUSPolling() {
+            const usAssets = assets.filter(a => a.market === 'us');
+            if (usAssets.length === 0) return;
+            async function fetchUSStock(symbol) {
+                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`;
+                try {
+                    const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                    if (!resp.ok) return null;
+                    const data = await resp.json();
+                    const meta = data.chart.result[0].meta;
+                    const price = meta.regularMarketPrice;
+                    const prevClose = meta.chartPreviousClose || meta.previousClose;
+                    const change = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+                    return { price, change, marketClosed: !isUSMarketOpen() };
+                } catch (e) { return null; }
+            }
+            async function fetchUS() {
+                if (usFetching) return;
+                if (!isUSMarketOpen()) {
+                    for (const asset of usAssets) { if (prices[asset.symbol]) prices[asset.symbol].marketClosed = true; }
+                    renderAll(); return;
+                }
+                usFetching = true;
+                for (let i = 0; i < usAssets.length; i++) {
+                    const symbol = usAssets[i].symbol;
+                    const result = await fetchUSStock(symbol);
+                    if (result) {
+                        const prevPrice = prices[symbol] ? prices[symbol].price : result.price;
+                        prices[symbol] = { price: result.price, prevPrice, change: result.change, lastUpdate: Date.now(), marketClosed: false };
+                        checkAlarm(symbol); renderAll();
+                    }
+                    if (i < usAssets.length - 1) await delay(1500);
+                }
+                usFetching = false; renderAll();
+            }
+            fetchUS();
+            if (usInterval) clearInterval(usInterval);
+            usInterval = setInterval(fetchUS, 120000);
+        }
+
+        // ===== BRAZILIAN STOCKS =====
+        let brInterval = null;
+
+        function startBRPolling() {
+            const brAssets = assets.filter(a => a.market === 'br' || a.market === 'brfund');
+            if (brAssets.length === 0) return;
+            async function fetchBR() {
+                if (!isBRMarketOpen()) {
+                    for (const asset of brAssets) { if (prices[asset.symbol]) prices[asset.symbol].marketClosed = true; }
+                    renderAll(); return;
+                }
+                const token = apiKeys.brapi || '';
+                for (let i = 0; i < brAssets.length; i++) {
+                    const symbol = brAssets[i].symbol;
+                    let url = `https://brapi.dev/api/quote/${symbol}`;
+                    if (token) url += `?token=${token}`;
+                    try {
+                        let resp = await fetch(url);
+                        if (!resp.ok && token) resp = await fetch(`https://brapi.dev/api/quote/${symbol}`);
+                        if (!resp.ok) continue;
+                        const data = await resp.json();
+                        if (data.results && data.results[0]) {
+                            const r = data.results[0];
+                            const price = r.regularMarketPrice;
+                            const change = r.regularMarketChangePercent || 0;
+                            const prevPrice = prices[r.symbol] ? prices[r.symbol].price : price;
+                            prices[r.symbol] = { price, prevPrice, change, lastUpdate: Date.now(), marketClosed: false };
+                            checkAlarm(r.symbol);
+                        }
+                    } catch (e) { console.warn('BR error for', symbol, e); }
+                    if (i < brAssets.length - 1) await delay(1000);
+                }
+                renderAll();
+            }
+            fetchBR();
+            if (brInterval) clearInterval(brInterval);
+            brInterval = setInterval(fetchBR, 120000);
+        }
+
+        // ===== MARKET HOURS =====
+        function isUSMarketOpen() {
+            const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const day = et.getDay();
+            if (day === 0 || day === 6) return false;
+            const t = et.getHours() * 60 + et.getMinutes();
+            return t >= 570 && t < 960;
+        }
+        function isBRMarketOpen() {
+            const brt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+            const day = brt.getDay();
+            if (day === 0 || day === 6) return false;
+            const t = brt.getHours() * 60 + brt.getMinutes();
+            return t >= 600 && t < 1020;
+        }
+
+        // ===== FETCH SINGLE ASSET (ignores market hours) =====
+        async function fetchSingleAsset(market, symbol) {
+            if (market === 'crypto') {
+                const endpoints = ['https://api.binance.us/api/v3/ticker/24hr','https://api1.binance.com/api/v3/ticker/24hr'];
+                for (const ep of endpoints) {
+                    try {
+                        const resp = await fetch(ep); if (!resp.ok) continue;
+                        const ticker = (await resp.json()).find(t => t.symbol === symbol);
+                        if (ticker) {
+                            const price = parseFloat(ticker.lastPrice);
+                            prices[symbol] = { price, prevPrice: price, change: parseFloat(ticker.priceChangePercent)||0, lastUpdate: Date.now() };
+                            checkAlarm(symbol); renderAll(); return;
+                        }
+                    } catch(e) {}
+                }
+                prices[symbol] = { price:0, prevPrice:0, change:0, lastUpdate:Date.now(), invalid:true }; renderAll();
+            } else if (market === 'us') {
+                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`;
+                try {
+                    const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data.chart && data.chart.result && data.chart.result[0]) {
+                            const meta = data.chart.result[0].meta;
+                            const price = meta.regularMarketPrice;
+                            const prevClose = meta.chartPreviousClose || meta.previousClose;
+                            prices[symbol] = { price, prevPrice:price, change: prevClose?((price-prevClose)/prevClose)*100:0, lastUpdate:Date.now(), marketClosed:!isUSMarketOpen() };
+                            checkAlarm(symbol); renderAll(); return;
+                        }
+                    }
+                } catch(e) { console.warn('Single fetch error', symbol, e); }
+                prices[symbol] = { price:0, prevPrice:0, change:0, lastUpdate:Date.now(), invalid:true }; renderAll();
+            } else if (market === 'br' || market === 'brfund') {
+                const token = apiKeys.brapi || '';
+                let url = `https://brapi.dev/api/quote/${symbol}`; if (token) url += `?token=${token}`;
+                try {
+                    let resp = await fetch(url);
+                    if (!resp.ok && token) resp = await fetch(`https://brapi.dev/api/quote/${symbol}`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data.results && data.results[0]) {
+                            const r = data.results[0];
+                            prices[r.symbol] = { price:r.regularMarketPrice, prevPrice:r.regularMarketPrice, change:r.regularMarketChangePercent||0, lastUpdate:Date.now(), marketClosed:!isBRMarketOpen() };
+                            checkAlarm(r.symbol); renderAll(); return;
+                        }
+                    }
+                } catch(e) { console.warn('Single fetch error', symbol, e); }
+                prices[symbol] = { price:0, prevPrice:0, change:0, lastUpdate:Date.now(), invalid:true }; renderAll();
+            }
+        }
+
+        // ===== MARKETS (indices) =====
+        const MARKETS = [
+            // Indexes
+            { symbol: '^GSPC',  name: 'S&P 500',        group: 'Indexes', flag: 'us' },
+            { symbol: '^DJI',   name: 'Dow Jones',      group: 'Indexes', flag: 'us' },
+            { symbol: '^BVSP',  name: 'Ibovespa',       group: 'Indexes', flag: 'br' },
+            { symbol: '^N225',  name: 'Nikkei 225',     group: 'Indexes', flag: 'jp' },
+            { symbol: '000300.SS', name: 'CSI 300',      group: 'Indexes', flag: 'cn' },
+            { symbol: '^HSI',   name: 'Hang Seng',      group: 'Indexes', flag: 'hk' },
+            { symbol: '^FTSE',  name: 'FTSE 100',       group: 'Indexes', flag: 'gb' },
+            { symbol: '^GDAXI', name: 'DAX',            group: 'Indexes', flag: 'de' },
+            { symbol: '^FCHI',  name: 'CAC 40',         group: 'Indexes', flag: 'fr' },
+            { symbol: '^NSEI',  name: 'Nifty 50',       group: 'Indexes', flag: 'in' },
+            { symbol: '^VIX',   name: 'VIX Fear Index', group: 'Indexes', flag: 'us' },
+            // ETFs
+            { symbol: 'VOO',    name: 'VOO (S&P 500)',   group: 'ETFs', flag: 'us' },
+            { symbol: 'EWZ',    name: 'EWZ (Brazil)',    group: 'ETFs', flag: 'br' },
+            { symbol: 'EEM',    name: 'EEM (Emerging)',  group: 'ETFs', flag: 'un' },
+            { symbol: 'MCHI',   name: 'MCHI (MSCI China)', group: 'ETFs', flag: 'cn' },
+            { symbol: 'FXI',    name: 'FXI (China)',     group: 'ETFs', flag: 'cn' },
+            { symbol: 'INDA',   name: 'INDA (India)',    group: 'ETFs', flag: 'in' },
+            { symbol: 'EWW',    name: 'EWW (Mexico)',    group: 'ETFs', flag: 'mx' },
+            { symbol: 'EWY',    name: 'EWY (S. Korea)',  group: 'ETFs', flag: 'kr' },
+            { symbol: 'ACWI',   name: 'ACWI (World)',    group: 'ETFs', flag: 'un' },
+        ];
+        let marketsInterval = null;
+
+        function startMarketsPolling() {
+            async function fetchMarkets() {
+                for (let i = 0; i < MARKETS.length; i++) {
+                    const mkt = MARKETS[i];
+                    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mkt.symbol)}?interval=1d&range=2d`;
+                    try {
+                        const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                        if (!resp.ok) continue;
+                        const data = await resp.json();
+                        if (data.chart && data.chart.result && data.chart.result[0]) {
+                            const meta = data.chart.result[0].meta;
+                            const price = meta.regularMarketPrice;
+                            const prevClose = meta.chartPreviousClose || meta.previousClose;
+                            const change = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+                            const prevPrice = prices[mkt.symbol] ? prices[mkt.symbol].price : price;
+                            prices[mkt.symbol] = { price, prevPrice, change, lastUpdate: Date.now() };
+                        }
+                    } catch (e) { console.warn('Market error for', mkt.symbol, e); }
+                    if (i < MARKETS.length - 1) await delay(1500);
+                }
+                renderMarkets();
+            }
+            fetchMarkets();
+            if (marketsInterval) clearInterval(marketsInterval);
+            marketsInterval = setInterval(fetchMarkets, 300000); // every 5 min
+        }
+
+        function renderMarkets() {
+            const container = document.getElementById('markets-table-container');
+            const groups = {};
+            for (const m of MARKETS) { if (!groups[m.group]) groups[m.group]=[]; groups[m.group].push(m); }
+            const groupIcons = { 'Indexes': '📊', 'ETFs': '📦' };
+            let html = '';
+            for (const [group, items] of Object.entries(groups)) {
+                html += `<div style="margin-bottom:16px;"><div style="font-size:0.75rem;color:#888;text-transform:uppercase;padding:4px 12px;margin-bottom:4px;">${groupIcons[group]||''} ${group}</div>
+                    <table><thead><tr><th>Index</th><th>Price</th><th>Change</th><th>Updated</th></tr></thead><tbody>`;
+                for (const m of items) {
+                    const p = prices[m.symbol];
+                    const priceVal = p ? p.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+                    const changeVal = p ? (p.change>=0?'+':'')+p.change.toFixed(2)+'%' : '—';
+                    const changeClass = p ? (p.change>=0?'change-positive':'change-negative') : '';
+                    html += `<tr><td><img src="https://flagcdn.com/20x15/${m.flag}.png" style="vertical-align:middle;margin-right:6px;border-radius:2px;"> <strong>${m.name}</strong> <span style="color:#666;font-size:0.75rem;">${m.symbol}</span></td>
+                        <td class="price">${priceVal}</td><td class="${changeClass}">${changeVal}</td><td>${p?timeAgo(p.lastUpdate):'—'}</td></tr>`;
+                }
+                html += '</tbody></table></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        // ===== COMMODITIES =====
+        const COMMODITIES = [
+            // ⚡ ENERGY
+            { symbol: 'BZ=F',  name: 'Brent Oil',      group: 'Energy' },
+            { symbol: 'CL=F',  name: 'Crude Oil (WTI)', group: 'Energy' },
+            // 🥇 METALS
+            { symbol: 'GC=F',  name: 'Gold',            group: 'Metals' },
+            { symbol: 'SI=F',  name: 'Silver',          group: 'Metals' },
+            { symbol: 'HG=F',  name: 'Copper',          group: 'Metals' },
+            { symbol: 'TIO=F', name: 'Iron Ore',        group: 'Metals' },
+            // 🌾 AGRO
+            { symbol: 'ZS=F',  name: 'Soybeans',        group: 'Agro' },
+            { symbol: 'ZC=F',  name: 'Corn',            group: 'Agro' },
+            { symbol: 'SB=F',  name: 'Sugar',           group: 'Agro' },
+            { symbol: 'KC=F',  name: 'Coffee',          group: 'Agro' },
+            { symbol: 'CT=F',  name: 'Cotton',          group: 'Agro' },
+            { symbol: 'LE=F',  name: 'Live Cattle',     group: 'Agro' },
+            // 🌲 FORESTRY
+            { symbol: '0DQ.F', name: 'Wood Pulp',       group: 'Forestry', source: 'stooq' },
+        ];
+        let commoditiesInterval = null;
+
+        function startCommoditiesPolling() {
+            async function fetchCommodities() {
+                for (let i = 0; i < COMMODITIES.length; i++) {
+                    const commodity = COMMODITIES[i];
+                    try {
+                        let price, change;
+                        if (commodity.source === 'stooq') {
+                            const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(commodity.symbol.toLowerCase())}&f=sd2t2ohlcv&h&e=json`;
+                            const resp = await fetch(`/proxy/${encodeURIComponent(stooqUrl)}`);
+                            if (!resp.ok) continue;
+                            let text = await resp.text();
+                            text = text.replace(/"volume":}/g,'"volume":0}').replace(/"volume":,/g,'"volume":0,');
+                            const data = JSON.parse(text);
+                            if (data.symbols && data.symbols[0] && data.symbols[0].close) {
+                                price = parseFloat(data.symbols[0].close);
+                                const open = parseFloat(data.symbols[0].open);
+                                change = open ? ((price-open)/open)*100 : 0;
+                            } else continue;
+                        } else {
+                            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${commodity.symbol}?interval=1d&range=2d`;
+                            const resp = await fetch(`/proxy/${encodeURIComponent(yahooUrl)}`);
+                            if (!resp.ok) continue;
+                            const data = await resp.json();
+                            if (data.chart && data.chart.result && data.chart.result[0]) {
+                                const meta = data.chart.result[0].meta;
+                                price = meta.regularMarketPrice;
+                                const prevClose = meta.chartPreviousClose || meta.previousClose;
+                                change = prevClose ? ((price-prevClose)/prevClose)*100 : 0;
+                            } else continue;
+                        }
+                        const prevPrice = prices[commodity.symbol] ? prices[commodity.symbol].price : price;
+                        prices[commodity.symbol] = { price, prevPrice, change, lastUpdate: Date.now() };
+                    } catch(e) { console.warn('Commodity error for', commodity.symbol, e); }
+                    if (i < COMMODITIES.length - 1) await delay(1500);
+                }
+                renderCommodities();
+            }
+            fetchCommodities();
+            if (commoditiesInterval) clearInterval(commoditiesInterval);
+            commoditiesInterval = setInterval(fetchCommodities, 300000);
+        }
+
+        function renderCommodities() {
+            const container = document.getElementById('commodities-table-container');
+            const groups = {};
+            for (const c of COMMODITIES) { if (!groups[c.group]) groups[c.group]=[]; groups[c.group].push(c); }
+            const groupIcons = { 'Energy':'⚡', 'Metals':'🥇', 'Agro':'🌾', 'Forestry':'🌲' };
+            let html = '';
+            for (const [group, items] of Object.entries(groups)) {
+                html += `<div style="margin-bottom:16px;"><div style="font-size:0.75rem;color:#888;text-transform:uppercase;padding:4px 12px;margin-bottom:4px;">${groupIcons[group]||''} ${group}</div>
+                    <table><thead><tr><th>Commodity</th><th>Price</th><th>Change</th><th>Updated</th></tr></thead><tbody>`;
+                for (const c of items) {
+                    const p = prices[c.symbol];
+                    const priceVal = p ? (c.source==='stooq' ? p.price.toFixed(0) : '$ '+p.price.toFixed(2)) : '—';
+                    const changeVal = p ? (p.change>=0?'+':'')+p.change.toFixed(2)+'%' : '—';
+                    const changeClass = p ? (p.change>=0?'change-positive':'change-negative') : '';
+                    html += `<tr><td><strong>${c.name}</strong> <span style="color:#666;font-size:0.75rem;">${c.symbol}</span></td>
+                        <td class="price">${priceVal}</td><td class="${changeClass}">${changeVal}</td><td>${p?timeAgo(p.lastUpdate):'—'}</td></tr>`;
+                }
+                html += '</tbody></table></div>';
+            }
+            container.innerHTML = html;
+        }
+
+        // ===== START =====
+        function startTracking(market) {
+            if (market === 'crypto') startCryptoPolling();
+            else if (market === 'us') startUSPolling();
+            else if (market === 'br' || market === 'brfund') startBRPolling();
+        }
+
+        function updateStatus(msg, type) {
+            document.getElementById('status-bar').innerHTML = `<span class="${type}">${msg}</span> | ${new Date().toLocaleTimeString()}`;
+        }
+
+        renderAll(); renderFX(); renderMarkets(); renderCommodities();
+        applyWindowVisibility();
+        initVisibilityControls();
+        // Don't start polling here - wait for Firebase auth
+        // startFXPolling(); startCryptoPolling(); etc. are called in loadUserData()
+        setInterval(renderAll, 5000);
+        setInterval(renderAll, 5000);
+
+        async function fetchMissingPrices() {
+            for (const asset of assets) {
+                if (!prices[asset.symbol] || !prices[asset.symbol].price) {
+                    await fetchSingleAsset(asset.market, asset.symbol);
+                    await delay(1500);
+                }
+            }
+        }
+        // fetchMissingPrices() is called in loadUserData() after auth
+
+        function updateMarketStatus() {
+            const usOpen = isUSMarketOpen(), brOpen = isBRMarketOpen();
+            const mainLine = ['Crypto: 24/7', usOpen?'US: OPEN':'US: CLOSED', brOpen?'BR: OPEN':'BR: CLOSED'].join(' | ');
+            const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const brtNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+            const usTime = etNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const brTime = brtNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            // Calculate US market hours in BRT dynamically (handles DST)
+            const usOpen930ET = new Date();
+            usOpen930ET.setHours(9, 30, 0, 0);
+            const usClose400ET = new Date();
+            usClose400ET.setHours(16, 0, 0, 0);
+            // Convert ET times to BRT by creating dates in both timezones
+            const etOffset = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).getTime();
+            const brtOffset = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })).getTime();
+            const diffMs = brtOffset - etOffset;
+            // US market open/close in ET
+            const usOpenET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            usOpenET.setHours(9, 30, 0, 0);
+            const usCloseET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            usCloseET.setHours(16, 0, 0, 0);
+            // Add the BRT-ET difference to get BRT times
+            const usOpenBRT = new Date(usOpenET.getTime() + diffMs);
+            const usCloseBRT = new Date(usCloseET.getTime() + diffMs);
+            const usOpenStr = usOpenBRT.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const usCloseStr = usCloseBRT.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+            const scheduleLines = `<br><span style="color:#666;">US Market (NYSE): ${usOpenStr} – ${usCloseStr} BRT</span><br><span style="color:#666;">BR Market (B3): 10:00 AM – 5:00 PM BRT</span>`;
+            document.getElementById('status-bar').innerHTML = `<span style="color:#00d4aa;">${mainLine} | ${new Date().toLocaleTimeString()}</span>${scheduleLines}`;
+            const closedTag = '<span style="background:#4a0f0f;color:#f87171;font-size:0.65rem;padding:2px 8px;border-radius:4px;margin-left:8px;font-weight:bold;">CLOSED</span>';
+            const openTag   = '<span style="background:#0f3a1a;color:#4ade80;font-size:0.65rem;padding:2px 8px;border-radius:4px;margin-left:8px;font-weight:bold;">OPEN</span>';
+            document.getElementById('us-market-tag').innerHTML = usOpen ? openTag : closedTag;
+            document.getElementById('br-market-tag').innerHTML = brOpen ? openTag : closedTag;
+            document.getElementById('brfund-market-tag').innerHTML = brOpen ? openTag : closedTag;
+        }
+        updateMarketStatus();
+        setInterval(updateMarketStatus, 60000);
+
+    // ===== FIREBASE INIT =====
+    const firebaseConfig = {
+        apiKey: "AIzaSyB4Vv9C2uGMyh4TW1F_jC1N6zlFYOJA9no",
+        authDomain: "asset-scout-ab025.firebaseapp.com",
+        projectId: "asset-scout-ab025",
+        storageBucket: "asset-scout-ab025.firebasestorage.app",
+        messagingSenderId: "54068421044",
+        appId: "1:54068421044:web:73ac8150f1942286fed2e1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let isSignUp = false;
+
+    function toggleAuthMode() {
+        isSignUp = !isSignUp;
+        document.getElementById('auth-title').textContent = isSignUp ? 'Sign Up' : 'Login';
+        document.querySelector('#auth-container button').textContent = isSignUp ? 'Sign Up' : 'Login';
+        document.querySelector('.auth-toggle').textContent = isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign up";
+        document.getElementById('auth-error').textContent = '';
+    }
+
+    function authAction() {
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const errorEl = document.getElementById('auth-error');
+        errorEl.textContent = '';
+
+        if (!email || !password) { errorEl.textContent = 'Please fill in all fields.'; return; }
+
+        const action = isSignUp ? auth.createUserWithEmailAndPassword(email, password) : auth.signInWithEmailAndPassword(email, password);
+        action.then(() => {}).catch(err => {
+            errorEl.textContent = err.message.replace('Firebase: ', '');
+        });
+    }
+
+    function logout() {
+        auth.signOut();
+    }
+
+    // Listen for auth state changes
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            document.getElementById('user-email').textContent = user.email;
+            loadUserData();
+        } else {
+            currentUser = null;
+            document.getElementById('auth-container').style.display = 'block';
+            document.getElementById('app-container').style.display = 'none';
+        }
+    });
+
+    // ===== FIRESTORE SYNC =====
+    function getUserDoc() {
+        return db.collection('users').doc(currentUser.uid);
+    }
+
+    function loadUserData() {
+        getUserDoc().get().then(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.assets) { assets = data.assets; }
+                if (data.apiKeys) { apiKeys = data.apiKeys; }
+                if (data.windowPrefs) { windowPrefs = data.windowPrefs; }
+                if (data.perWindowColumns) { perWindowColumns = data.perWindowColumns; }
+            }
+            // Start the app
+            renderAll(); renderFX(); renderMarkets(); renderCommodities();
+            applyWindowVisibility(); initVisibilityControls();
+            startFXPolling(); startCryptoPolling(); startUSPolling(); startBRPolling();
+            setTimeout(startMarketsPolling, 3000);
+            setTimeout(startCommoditiesPolling, 8000);
+            updateMarketStatus();
+            fetchMissingPrices();
+        });
+    }
+
+    // Override save functions to sync to Firestore
+    const origSaveAssets = saveAssets;
+    saveAssets = function() {
+        origSaveAssets();
+        if (currentUser) getUserDoc().set({ assets, apiKeys, windowPrefs, perWindowColumns }, { merge: true });
+    };
+
+    const origSaveWindowPrefs = saveWindowPrefs;
+    saveWindowPrefs = function() {
+        origSaveWindowPrefs();
+        if (currentUser) getUserDoc().set({ windowPrefs }, { merge: true });
+    };
+
+    const origSaveColumnPrefs = saveColumnPrefs;
+    saveColumnPrefs = function() {
+        origSaveColumnPrefs();
+        if (currentUser) getUserDoc().set({ perWindowColumns }, { merge: true });
+    };
+
+    const origSaveApiKeys = saveApiKeys;
+    // Override the button's saveApiKeys
+    window._origSaveApiKeysBtn = window.saveApiKeys;
+    window.saveApiKeys = function() {
+        window._origSaveApiKeysBtn();
+        if (currentUser) getUserDoc().set({ apiKeys }, { merge: true });
+    };
+
+    </script>
+    </div><!-- end app-container -->
+</body>
+</html>
