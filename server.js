@@ -10,9 +10,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Proxy endpoint using query parameter
 app.get('/proxy', async (req, res) => {
-    const targetUrl = req.query.url;
+    let targetUrl = req.query.url;
     if (!targetUrl) {
         return res.status(400).json({ error: 'Missing url parameter' });
+    }
+    // Auto-add Brapi token for brapi.dev requests
+    if (targetUrl.includes('brapi.dev') && !targetUrl.includes('token=')) {
+        targetUrl += (targetUrl.includes('?') ? '&' : '?') + 'token=vymG61GdXbpALNUVm6k3f9';
     }
     try {
         const response = await fetch(targetUrl, {
