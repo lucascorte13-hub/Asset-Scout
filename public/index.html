@@ -821,8 +821,8 @@
                     let url = `https://brapi.dev/api/quote/${symbol}`;
                     if (token) url += `?token=${token}`;
                     try {
-                        let resp = await fetch(url);
-                        if (!resp.ok && token) resp = await fetch(`https://brapi.dev/api/quote/${symbol}`);
+                        let resp = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
+                        if (!resp.ok && token) resp = await fetch(`/proxy?url=${encodeURIComponent(`https://brapi.dev/api/quote/${symbol}`)}`);
                         if (!resp.ok) continue;
                         const data = await resp.json();
                         if (data.results && data.results[0]) {
@@ -895,8 +895,8 @@
                 const token = apiKeys.brapi || '';
                 let url = `https://brapi.dev/api/quote/${symbol}`; if (token) url += `?token=${token}`;
                 try {
-                    let resp = await fetch(url);
-                    if (!resp.ok && token) resp = await fetch(`https://brapi.dev/api/quote/${symbol}`);
+                    let resp = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
+                    if (!resp.ok && token) resp = await fetch(`/proxy?url=${encodeURIComponent(`https://brapi.dev/api/quote/${symbol}`)}`);
                     if (resp.ok) {
                         const data = await resp.json();
                         if (data.results && data.results[0]) {
