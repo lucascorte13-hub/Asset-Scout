@@ -681,7 +681,7 @@
                     const fx = CURRENCIES[i];
                     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${fx.symbol}?interval=1d&range=2d`;
                     try {
-                        const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                        const resp = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
                         if (!resp.ok) continue;
                         const data = await resp.json();
                         if (data.chart && data.chart.result && data.chart.result[0]) {
@@ -770,7 +770,7 @@
             async function fetchUSStock(symbol) {
                 const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`;
                 try {
-                    const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                    const resp = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
                     if (!resp.ok) return null;
                     const data = await resp.json();
                     const meta = data.chart.result[0].meta;
@@ -878,7 +878,7 @@
             } else if (market === 'us') {
                 const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`;
                 try {
-                    const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                    const resp = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
                     if (resp.ok) {
                         const data = await resp.json();
                         if (data.chart && data.chart.result && data.chart.result[0]) {
@@ -943,7 +943,7 @@
                     const mkt = MARKETS[i];
                     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(mkt.symbol)}?interval=1d&range=2d`;
                     try {
-                        const resp = await fetch(`/proxy/${encodeURIComponent(url)}`);
+                        const resp = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
                         if (!resp.ok) continue;
                         const data = await resp.json();
                         if (data.chart && data.chart.result && data.chart.result[0]) {
@@ -1016,7 +1016,7 @@
                         let price, change;
                         if (commodity.source === 'stooq') {
                             const stooqUrl = `https://stooq.com/q/l/?s=${encodeURIComponent(commodity.symbol.toLowerCase())}&f=sd2t2ohlcv&h&e=json`;
-                            const resp = await fetch(`/proxy/${encodeURIComponent(stooqUrl)}`);
+                            const resp = await fetch(`/proxy?url=${encodeURIComponent(stooqUrl)}`);
                             if (!resp.ok) continue;
                             let text = await resp.text();
                             text = text.replace(/"volume":}/g,'"volume":0}').replace(/"volume":,/g,'"volume":0,');
@@ -1028,7 +1028,7 @@
                             } else continue;
                         } else {
                             const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${commodity.symbol}?interval=1d&range=2d`;
-                            const resp = await fetch(`/proxy/${encodeURIComponent(yahooUrl)}`);
+                            const resp = await fetch(`/proxy?url=${encodeURIComponent(yahooUrl)}`);
                             if (!resp.ok) continue;
                             const data = await resp.json();
                             if (data.chart && data.chart.result && data.chart.result[0]) {

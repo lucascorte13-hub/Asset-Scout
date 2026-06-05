@@ -8,15 +8,19 @@ const PORT = process.env.PORT || 8080;
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Proxy endpoint for Yahoo Finance, Stooq, etc.
-app.get('/proxy/:url', async (req, res) => {
-    const targetUrl = decodeURIComponent(req.params.url);
+// Proxy endpoint using query parameter
+app.get('/proxy', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) {
+        return res.status(400).json({ error: 'Missing url parameter' });
+    }
     try {
         const response = await fetch(targetUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
         });
         const text = await response.text();
         res.set('Content-Type', response.headers.get('content-type') || 'application/json');
+        res.set('Access-Control-Allow-Origin', '*');
         res.send(text);
     } catch (e) {
         res.status(500).json({ error: e.message });
