@@ -1205,12 +1205,17 @@
         getUserDoc().get().then(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                if (data.assets) { assets = data.assets; }
-                if (data.apiKeys) { apiKeys = data.apiKeys; }
-                if (data.windowPrefs) { windowPrefs = data.windowPrefs; }
-                if (data.perWindowColumns) { perWindowColumns = data.perWindowColumns; }
+                if (data.assets && data.assets.length > 0) { assets = data.assets; localStorage.setItem('trackerAssets', JSON.stringify(assets)); }
+                if (data.apiKeys) { apiKeys = data.apiKeys; localStorage.setItem('trackerApiKeys', JSON.stringify(apiKeys)); }
+                if (data.windowPrefs) { windowPrefs = data.windowPrefs; localStorage.setItem('windowPrefs', JSON.stringify(windowPrefs)); }
+                if (data.perWindowColumns) { perWindowColumns = data.perWindowColumns; localStorage.setItem('perWindowColumns', JSON.stringify(perWindowColumns)); }
+            } else {
+                // First login - if localStorage has assets, push them to Firestore
+                if (assets.length > 0) {
+                    getUserDoc().set({ assets, apiKeys, windowPrefs, perWindowColumns }, { merge: true });
+                }
             }
-            // Start the app
+            // Start the app with loaded data
             renderAll(); renderFX(); renderMarkets(); renderCommodities();
             applyWindowVisibility(); initVisibilityControls();
             startFXPolling(); startCryptoPolling(); startUSPolling(); startBRPolling();
@@ -1218,6 +1223,14 @@
             setTimeout(startCommoditiesPolling, 8000);
             updateMarketStatus();
             fetchMissingPrices();
+        }).catch(err => {
+            console.warn('Firestore load error:', err);
+            renderAll(); renderFX(); renderMarkets(); renderCommodities();
+            applyWindowVisibility(); initVisibilityControls();
+            startFXPolling(); startCryptoPolling(); startUSPolling(); startBRPolling();
+            setTimeout(startMarketsPolling, 3000);
+            setTimeout(startCommoditiesPolling, 8000);
+            updateMarketStatus();
         });
     }
 
