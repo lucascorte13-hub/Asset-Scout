@@ -16,7 +16,8 @@ app.get('/proxy', async (req, res) => {
     }
     // Auto-add Brapi token for brapi.dev requests
     if (targetUrl.includes('brapi.dev') && !targetUrl.includes('token=')) {
-        targetUrl += (targetUrl.includes('?') ? '&' : '?') + 'token=vymG61GdXbpALNUVm6k3f9';
+        const brapiToken = process.env.BRAPI_TOKEN || '';
+        if (brapiToken) targetUrl += (targetUrl.includes('?') ? '&' : '?') + 'token=' + brapiToken;
     }
     try {
         const response = await fetch(targetUrl, {
